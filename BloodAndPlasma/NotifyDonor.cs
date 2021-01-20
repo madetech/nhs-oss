@@ -7,6 +7,9 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Notify.Client;
+using Notify.Models;
+using Notify.Models.Responses;
 
 namespace BloodAndPlasma
 {
@@ -17,6 +20,8 @@ namespace BloodAndPlasma
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
+            var client = new NotificationClient("");
+
             log.LogInformation("C# HTTP trigger function processed a request.");
 
             string name = req.Query["name"];
