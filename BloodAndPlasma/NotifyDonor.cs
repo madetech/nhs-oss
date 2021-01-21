@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -7,34 +6,47 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Notify.Client;
-using Notify.Models;
-using Notify.Models.Responses;
+using System.Collections.Generic;
+using Microsoft.Azure.Functions.Extensions.DependencyInjection;
+using Notify.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace BloodAndPlasma
 {
-    public static class NotifyDonor
+    public class NotifyDonor
     {
+        private readonly IAsyncNotificationClient _client;
+        private readonly NotifyDonorSettings _settings;
+
+        public NotifyDonor(IAsyncNotificationClient client, IOptions<NotifyDonorSettings> notifyDonorSettings)
+        {
+            _client = client;
+            _settings = notifyDonorSettings.Value;
+        }
+
         [FunctionName("NotifyDonor")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
+        public async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            var client = new NotificationClient("");
+            var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            var data = JsonConvert.DeserializeObject<SendEmail>(requestBody);
 
-            log.LogInformation("C# HTTP trigger function processed a request.");
+            var personalisation = new Dictionary<string, dynamic> { { "first_name", data.FirstName }, { "donor_id", data.DonorId } };
 
-            string name = req.Query["name"];
+            var response = await _client.SendEmailAsync(data.Email, _settings.EmailTemplate, personalisation);
 
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
-            name = name ?? data?.name;
+            log.LogInformation("Sent email");
+            log.LogInformation(JsonConvert.SerializeObject(response));
 
-            string responseMessage = string.IsNullOrEmpty(name)
-                ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-                : $"Hello, {name}. This HTTP triggered function executed successfully.";
+            return new OkObjectResult(new { message = "email sent" });
+        }
 
-            return new OkObjectResult(responseMessage);
+        private class SendEmail
+        {
+            public string Email { get; set; }
+            public string FirstName { get; set; }
+            public int DonorId { get; set; }
         }
     }
 }
