@@ -1,10 +1,8 @@
 ﻿using Microsoft.Azure.WebJobs;
-using Notify.Client;
 using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Notify.Interfaces;
-using Microsoft.Extensions.Options;
+using System;
 
 [assembly: FunctionsStartup(typeof(BloodAndPlasma.Startup))]
 namespace BloodAndPlasma
@@ -13,16 +11,15 @@ namespace BloodAndPlasma
     {
         public override void Configure(IFunctionsHostBuilder builder)
         {
+            var context = builder.GetContext();
             builder.Services.AddOptions<NotifyDonorSettings>()
                 .Configure<IConfiguration>((settings, configuration) =>
                 {
-                    configuration.GetSection("NotifyDonorSettings").Bind(settings);
+                    configuration.GetSection(nameof(NotifyDonorSettings)).Bind(settings);
                 });
-            builder.Services.AddTransient<IAsyncNotificationClient, NotificationClient>(sp => 
-                {
-                    var settings = sp.GetRequiredService<IOptions<NotifyDonorSettings>>();
-                    return new NotificationClient(settings.Value.NotifyApiKey);
-                });
+            builder.Services.AddHttpClient(nameof(NotifyDonor), client => {
+                client.BaseAddress = new Uri(context.Configuration[$"{nameof(NotifyDonorSettings)}:{nameof(NotifyDonorSettings.BaseAddress)}"]);
+            });
         }
     }
 }
